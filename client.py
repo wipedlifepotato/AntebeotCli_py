@@ -120,105 +120,121 @@ class AntebeotClient():
          return response.json()
         else:
          return {'error': 'Ошибка на сервере: код состояния {} и пустой текст'.format(response.status_code)}
-
-
-    # Добавьте другие методы, которые вы хотите использовать
-    def wrapperData(w, base_url = '/'):
-     base_url = self.RestApiURL + base_url 
-     cook = {'usession': self.mUCookiesSessions} if not self.mUCookiesSessions is None else {}
-     response = requests.get(base_url, params=w, cookies=cook)
-     if response.status_code == 200:
-        return response.json()
-     else: return {'error': "Ошибка со стороны API {}".format(response.status_code)}
-# user API part        
-    # GPT was rewrite my code.
-    def user_data(w):
-     return wrapperData(w, base_url)
-
-    def gen_new_address(cryptocoin):
-     return user_data({'w': "genAddress", 'cryptocoin': cryptocoin})
-
-    def update_session():
-     return user_data({'w': "updateSession"})
-
-    def change_password(last_pass, new_pass):
-     return user_data({'w': "changePassword", 'last_pass': last_pass, 'new_pass': new_pass})
-
-    def get_own_input(cryptocoin):
-     return user_data({'w': "getowninput", 'cryptocoin': cryptocoin})
-
-    def user_have_2fa():
-     return user_data({"w": "checkOTP"})
-
-    user_have_otp = user_have_2fa
-
-    def get_user_info(w=None):
-     if w is None:
-        w = {}
-     return user_data(w)
-# /api/ part
-    def api_data(w):
-        return wrapperData(w, base_url = '/api/')
-
-    def get_allow_coins():
-     return api_data({'w': "getallowcoins"})
-
-    def output_money(login, password, output_address, count_of_money, coin_name, captcha_data, ulang):
-     return api_data({
-        'w': "output",
-        'acc': login,
-        'pass': password,
-        'oAdr': output_address,
-        'cMoney': count_of_money,
-        'coinname': coin_name,
-        'captchaText': captcha_data,
-        'lang': ulang
-    })
-# /exchange/ part
-    def exchange_data(w):
-        return wrapperData (w, base_url = '/exchange/')
-    def add_order_to_sell_coin2coin(sell_namecoin, buy_namecoin, price, volume_start, volume_max):
-     return exchange_data({
-        'w': 'addOrderToSellCoin2Coin',
-        'toGiveName': sell_namecoin,
-        'toGetName': buy_namecoin,
-        'Price': price,
-        'VolumeStart': volume_start,
-        'VolumeMax': volume_max,
-    })
-
-    def get_my_done_trade():
-        return exchange_data({'w': 'getMyDoneTrade'})
     
-    def get_own_orders():
-        return exchange_data({'w': 'getOwnOrders'})
-    
-    def get_reviews_by_about(who):
-        return exchange_data({'w': 'getReviewsByAbout', 'who': who})
-    
-    def get_reviews_by_reviewer(who):
-        return exchange_data({'w': 'getReviewsByReviewer', 'who': who})
-    
-    def get_my_reviews():
-        return exchange_data({'w': 'getMyReviews'})
-    
-    def add_review(id_, text):
-        return exchange_data({'w': 'addReview', 'id': id_, 'text': text})
-    
-    def get_orders(active=True, offset=0, lim=25):
-        return exchange_data({'w': 'getOrders', 'a': active, 'offset': offset, 'lim': lim})
-    
-    def get_order_by_name(who, offset=0, lim=25):
-        return exchange_data({'w': 'getOrderByName', 'who': who, 'offset': offset, 'lim': lim})
-    
-    def get_trader_stats( who ):
-        return exchange_data({'w': 'getTraderStats', 'who': who})
-    
-    def rem_order(id_):
-        return exchange_data({'w': 'removeMyOrderByID', 'id': id_})
-    
-    def change_active_order(id_, s=True):
-        return exchange_data( {'w': 'changeActiveOrder', 'id': id_, 's': s} )
-    
-    def do_trade(id_, count=1):
-        return exchange_data({'w': 'doTrade', 'count': count, 'id': id_})
+    class NotFoundUserPart(Exception): pass
+    def getAPIForUser(self, user_part, ignoreNotSession = False): # maybe we want just get getallowcoins or another things where not need to auth, so ignoreNotSession would be false everytime but
+        usession = self.mUCookiesSessions[user_part]['usession'] if not self.mUCookiesSessions[user_part] is None else ""
+
+        if usession == {} and not ignoreNotSession: raise NotFoundUserPart
+        return self.uApiWrapper(usession, self.RestApiURL)
+
+    # use Api for User by usession from login. So we can 
+    class uApiWrapper:
+        def __init__(self, usession, rApi):
+            #self.user_part = user_part
+            self.usession = usession
+            self.RestApiURL = rApi
+            pass
+
+        # Добавьте другие методы, которые вы хотите использовать
+        def wrapperData(self,w, base_url = '/'):
+         base_url = self.RestApiURL + base_url 
+         cook = {'usession': self.usession}
+         response = requests.get(base_url, params=w, cookies=cook)
+         if response.status_code == 200:
+            return response.json()
+         else: return {'error': "Ошибка со стороны API {}".format(response.status_code)}
+  # us  er API part        
+        # GPT was rewrite my code.
+        def notify_data(self,w):
+            return self.wrapperData(w, base_url='/notify')
+        def user_data(self,w):
+         return self.wrapperData(w, base_url='/user')
+  
+        def gen_new_address(self,cryptocoin):
+         return self.user_data({'w': "genAddress", 'cryptocoin': cryptocoin})
+  
+        def update_session(self):
+         return self.user_data({'w': "updateSession"})
+  
+        def change_password(self,last_pass, new_pass):
+         return self.user_data({'w': "changePassword", 'last_pass': last_pass, 'new_pass': new_pass})
+  
+        def get_own_input(self,cryptocoin):
+         return self.user_data({'w': "getowninput", 'cryptocoin': cryptocoin})
+  
+        def user_have_2fa(self):
+         return self.user_data({"w": "checkOTP"})
+  
+        user_have_otp = user_have_2fa
+  
+        def get_user_info(self,w=None):
+         if w is None:
+            w = {}
+         return self.user_data(w)
+  # /a  pi/ part
+        def api_data(self,w):
+            return self.wrapperData(w, base_url = '/api')
+  
+        def get_allow_coins(self):
+         return self.api_data({'w': "getallowcoins"})
+  
+        def output_money(self,login, password, output_address, count_of_money, coin_name, captcha_data, ulang):
+         return self.api_data({
+            'w': "output",
+            'acc': login,
+            'pass': password,
+            'oAdr': output_address,
+            'cMoney': count_of_money,
+            'coinname': coin_name,
+            'captchaText': captcha_data,
+            'lang': ulang
+        })
+  # /e  xchange/ part
+        def exchange_data(self,w):
+            return self.wrapperData (w, base_url = '/exchange')
+        def add_order_to_sell_coin2coin(self,sell_namecoin, buy_namecoin, price, volume_start, volume_max):
+         return self.exchange_data({
+            'w': 'addOrderToSellCoin2Coin',
+            'toGiveName': sell_namecoin,
+            'toGetName': buy_namecoin,
+            'Price': price,
+            'VolumeStart': volume_start,
+            'VolumeMax': volume_max,
+        })
+  
+        def get_my_done_trade(self):
+            return self.exchange_data({'w': 'getMyDoneTrade'})
+        
+        def get_own_orders(self):
+            return self.exchange_data({'w': 'getOwnOrders'})
+        
+        def get_reviews_by_about(self,who):
+            return self.exchange_data({'w': 'getReviewsByAbout', 'who': who})
+        
+        def get_reviews_by_reviewer(self,who):
+            return self.exchange_data({'w': 'getReviewsByReviewer', 'who': who})
+        
+        def get_my_reviews(self):
+            return self.exchange_data({'w': 'getMyReviews'})
+        
+        def add_review(self,id_, text):
+            return self.exchange_data({'w': 'addReview', 'id': id_, 'text': text})
+        
+        def get_orders(self,active=True, offset=0, lim=25):
+            return self.exchange_data({'w': 'getOrders', 'a': active, 'offset': offset, 'lim': lim})
+        
+        def get_order_by_name(self,who, offset=0, lim=25):
+            return self.exchange_data({'w': 'getOrderByName', 'who': who, 'offset': offset, 'lim': lim})
+        
+        def get_trader_stats(self, who ):
+            return self.exchange_data({'w': 'getTraderStats', 'who': who})
+        
+        def rem_order(self,id_):
+            return self.exchange_data({'w': 'removeMyOrderByID', 'id': id_})
+        
+        def change_active_order(self,id_, s=True):
+            return self.exchange_data( {'w': 'changeActiveOrder', 'id': id_, 's': s} )
+        
+        def do_trade(self, id_, count=1):
+            return self.exchange_data({'w': 'doTrade', 'count': count, 'id': id_})
