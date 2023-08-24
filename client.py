@@ -1,6 +1,19 @@
-import requests, hashlib, json
+import requests, hashlib, json, pickle
 
 class AntebeotClient():
+    def loadAll(self, iFile="sessions.dat"):
+        try:
+         with open(iFile, "rb") as in_:
+            self.mUCookiesSessions = pickle.load(in_)
+            in_.close()
+            pass
+        except Exception as _:
+            print(" Not found last sessions. Continue " )
+            pass
+    def saveAll(self, oFile = "sessions.dat"):
+        with open(oFile, "wb") as out:
+            pickle.dump(self.mUCookiesSessions, out)
+            out.close()
     # print a debug info
     def pDebug(self, msg):
         if self.dFlag:
@@ -123,15 +136,20 @@ class AntebeotClient():
     
     class NotFoundUserPart(Exception): pass
     def getAPIForUser(self, user_part, ignoreNotSession = False): # maybe we want just get getallowcoins or another things where not need to auth, so ignoreNotSession would be false everytime but
-        usession = self.mUCookiesSessions[user_part]['usession'] if not self.mUCookiesSessions[user_part] is None else ""
-
-        if usession == {} and not ignoreNotSession: raise NotFoundUserPart
-        return self.uApiWrapper(usession, self.RestApiURL)
+        try:
+         usession = self.mUCookiesSessions[user_part]['usession'] if not self.mUCookiesSessions[user_part] is None else ""
+         captcha_id = self.mUCookiesSessions[user_part]['captcha_id'] if not self.mUCookiesSessions[user_part] is None else ""
+         if usession == {} and not ignoreNotSession: raise NotFoundUserPart
+         return self.uApiWrapper(usession, self.RestApiURL, captcha_id)
+        except KeyError as _:
+            print ("KeyError")
+            return self.uApiWrapper(usession, self.RestApiURL, "")
+            pass
 
     # use Api for User by usession from login. So we can 
     class uApiWrapper:
-        def __init__(self, usession, rApi):
-            #self.user_part = user_part
+        def __init__(self, usession, rApi, captcha_id):
+            self.captcha_id = captcha_id
             self.usession = usession
             self.RestApiURL = rApi
             pass
@@ -139,15 +157,21 @@ class AntebeotClient():
         # Добавьте другие методы, которые вы хотите использовать
         def wrapperData(self,w, base_url = '/'):
          base_url = self.RestApiURL + base_url 
-         cook = {'usession': self.usession}
+         cook = {'usession': self.usession, 'captcha_id': self.captcha_id}
+         print("Do requests on {} with params {}".format(base_url, w))
          response = requests.get(base_url, params=w, cookies=cook)
          if response.status_code == 200:
+            print(response.text)
             return response.json()
          else: return {'error': "Ошибка со стороны API {}".format(response.status_code)}
   # us  er API part        
         # GPT was rewrite my code.
         def notify_data(self,w):
             return self.wrapperData(w, base_url='/notify')
+
+        def notify(self):
+            return self.notify_data()
+
         def user_data(self,w):
          return self.wrapperData(w, base_url='/user')
   
@@ -174,13 +198,16 @@ class AntebeotClient():
          return self.user_data(w)
   # /a  pi/ part
         def api_data(self,w):
+            print("do send w: {}".format(w))
             return self.wrapperData(w, base_url = '/api')
   
         def get_allow_coins(self):
          return self.api_data({'w': "getallowcoins"})
+        def get_balance(self):
+         return self.api_data({'w': "getbalance"})
   
-        def output_money(self,login, password, output_address, count_of_money, coin_name, captcha_data, ulang):
-         return self.api_data({
+        def output_money(self,login, password, output_address, count_of_money, coin_name, captcha_data, ulang = "ru_RU"):
+         sData = {
             'w': "output",
             'acc': login,
             'pass': password,
@@ -188,8 +215,9 @@ class AntebeotClient():
             'cMoney': count_of_money,
             'coinname': coin_name,
             'captchaText': captcha_data,
-            'lang': ulang
-        })
+            'lang': ulang}
+         print("sData: {}".format(sData))
+         return self.api_data( sData )
   # /e  xchange/ part
         def exchange_data(self,w):
             return self.wrapperData (w, base_url = '/exchange')
